@@ -1,0 +1,6 @@
+C:\Onedrive\Programming\git\SearchQuery\SearchQuery\bin\Debug\SearchQuery.exe.config
+C:\Onedrive\Programming\git\SearchQuery\SearchQuery\bin\Debug\SearchQuery.exe
+C:\Onedrive\Programming\git\SearchQuery\SearchQuery\bin\Debug\SearchQuery.pdb
+C:\Onedrive\Programming\git\SearchQuery\SearchQuery\obj\Debug\SearchQuery.csprojResolveAssemblyReference.cache
+C:\Onedrive\Programming\git\SearchQuery\SearchQuery\obj\Debug\SearchQuery.exe
+C:\Onedrive\Programming\git\SearchQuery\SearchQuery\obj\Debug\SearchQuery.pdb
