@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Linq.Dynamic;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -40,10 +41,7 @@ namespace Search
                 throw (ErrorInfo = new Exception("Found invalid linked field or property: " + invalidFieldName));
         }
 
-        public IQueryable<T> GetQuery<T>(IQueryable<T> data)
-        {
-            return ApplyFilters<T>(data);
-        }
+        protected abstract IQueryable<T> GetQuery<T>(IQueryable<T> data);
 
         public List<T> GetResults<T>(IQueryable<T> data)
         {
@@ -58,8 +56,28 @@ namespace Search
         public int PageSize { get; set; }
         public int CurrentPage { get; set; }
         public string SortField { get; set; }
-        public string SortDir { get; set; }
-        public string SortString { get { return SortField + " " + SortDir; } }
+        
+        public string SortDir
+        {
+            get { return _sortDir; }
+            set
+            {
+                //only allow valid sort values
+                var acceptedValues = new[] { "asc", "desc" };
+                if (acceptedValues.Contains(value.ToLower()))
+                    _sortDir = value;
+            }
+        }
+        private string _sortDir = string.Empty;
+
+        public string SortString
+        {
+            get
+            {
+                return string.IsNullOrWhiteSpace(SortField) || string.IsNullOrWhiteSpace(SortDir) ? string.Empty 
+                                                                                                  : SortField + " " + SortDir;
+            }
+        }
 
         #endregion
 
@@ -126,7 +144,11 @@ namespace Search
             var fields = GetType().GetFields().Cast<MemberInfo>()
                                   .Concat(GetType().GetProperties())
                                   .Select(m => GetTargetField(m))
-                                  .Where(s => !string.IsNullOrEmpty(s));
+                                  .Where(s => !string.IsNullOrEmpty(s))
+                                  .ToList();
+
+            //Also check the Sort field
+            if (!string.IsNullOrWhiteSpace(SortField)) fields.Add(SortField);
 
             //loop through linked field names and validate against the result type
             foreach (string fieldName in fields)
@@ -140,7 +162,7 @@ namespace Search
         {
             //loop through the "levels" (e.g. Order / Customer / Name) validating that the fields/properties all exist
             Type currentType = ResultType;
-            foreach (string currentLevel in DeQualifyExpression(fieldName, ResultType))
+            foreach (string currentLevel in DeQualifyFieldName(fieldName, ResultType))
             {
                 MemberInfo match = (MemberInfo)currentType.GetField(currentLevel) ?? currentType.GetProperty(currentLevel);
                 if (match == null) return false;
@@ -157,7 +179,7 @@ namespace Search
         /// </summary>
         /// <typeparam name="TItem"></typeparam>
         /// <param name="data"></param>
-        private IQueryable<T> ApplyFilters<T>(IQueryable<T> data)
+        protected IQueryable<T> ApplyFilters<T>(IQueryable<T> data)
         {
             if (data == null) return null;
             IQueryable<T> retVal = data.AsQueryable();
@@ -185,7 +207,10 @@ namespace Search
                 }
             }
             catch (Exception ex) { throw (ErrorInfo = ex); }
-            return retVal;
+
+            //Add the OrderBy if applicable
+            return string.IsNullOrWhiteSpace(SortString) ? retVal.OrderBy(SortString) 
+                                                         : retVal;
         }
 
         /// <summary>
@@ -225,16 +250,15 @@ namespace Search
             //which will contain the value to be checked
             var param = Expression.Parameter(ResultType, "t");
             Expression left = null;
-            foreach (var part in DeQualifyExpression(targetField, ResultType))
+            foreach (var part in DeQualifyFieldName(targetField, ResultType))
                 left = Expression.PropertyOrField(left == null ? param : left, part);
 
             //Get the value against which the property/field will be compared
             var right = Expression.Constant(value);
 
             //join the expressions with the specified operator
-            var binaryExpression = Expression.MakeBinary(comparison, left, new SwapVisitor(left, param).Visit(right));
+            var binaryExpression = Expression.MakeBinary(comparison, left, right);
             return Expression.Lambda<Func<T, bool>>(binaryExpression, param);
-
         }
 
         /// <summary>
@@ -244,26 +268,12 @@ namespace Search
         /// <param name="targetField"></param>
         /// <param name="targetType"></param>
         /// <returns></returns>
-        public static List<string> DeQualifyExpression(string targetField, Type targetType)
+        public static List<string> DeQualifyFieldName(string targetField, Type targetType)
         {
             var r = targetField.Split('.').ToList();
             foreach (var p in targetType.Name.Split('.'))
                 if (r.First() == p) r.RemoveAt(0);
             return r;
-        }
-
-        public class SwapVisitor : ExpressionVisitor
-        {
-            private readonly Expression from, to;
-            public SwapVisitor(Expression from, Expression to)
-            {
-                this.from = from;
-                this.to = to;
-            }
-            public override Expression Visit(Expression node)
-            {
-                return node == from ? to : base.Visit(node);
-            }
         }
 
         /// <summary>
@@ -302,14 +312,9 @@ namespace Search
     {
         public OrderSearchFilter() : base(typeof(Order)) { }
 
-        public void RunSearch(IQueryable<Order> data)
+        protected override IQueryable<T> GetQuery<T>(IQueryable<T> data)
         {
-            Console.WriteLine("Running search...");
-            Results = GetResults(data);
-            Console.WriteLine("Result transaction numbers:");
-            foreach (var o in Results)
-                Console.WriteLine(o.TxNumber);
-            Console.ReadKey();
+            return ApplyFilters(data);
         }
 
         [LinkedField("TxDate")]

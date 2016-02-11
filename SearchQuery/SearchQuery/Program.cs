@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Search
 {
@@ -15,12 +13,20 @@ namespace Search
             CreateSampleData();
 
             //create search
-            DateTime from = new DateTime(2016, 1, 1);
-            Search.TxNumber = 2;
+            DateTime from = new DateTime(2015, 1, 1);
+            //Search.TxNumber = 2;
             Search.TransactionDateFrom = from;
+            Search.SortDir = "Desc";
+            Search.SortField = "TxNumber";
+            Search.CustomerName = "Jill";
 
-            //start search
-            Search.RunSearch(Orders.AsQueryable());
+            //Run search
+            Console.WriteLine("Running search...");
+            var results = Search.GetResults(Orders.AsQueryable());
+            Console.WriteLine("Result transaction numbers:");
+            foreach (var o in results)
+                Console.WriteLine(o.TxNumber);
+            Console.ReadKey();
         }
 
         static void CreateSampleData()
