@@ -30,13 +30,17 @@ namespace Search
     [Serializable]
     public abstract class SearchQuery<T>
     {
+        //defaults
+        protected int _pageCount = 10;
+        protected int _currentPage = 1;
+        protected int _pageSize = 10;
+        protected string _sortDir = string.Empty;
+        protected string _sortField = string.Empty;
+
         public SearchQuery()
         {
             //defaults
-            PageCount = 10;
-            CurrentPage = 1;
-            PageSize = 10;
-            string invalidFieldName = string.Empty; // GetInvalidLinkedField();
+            string invalidFieldName = GetInvalidLinkedField();
             if (!string.IsNullOrEmpty(invalidFieldName))
                 throw (ErrorInfo = new Exception("Found invalid linked field or property: " + invalidFieldName));
         }
@@ -62,11 +66,26 @@ namespace Search
 
         #region Search Properties
 
-        public int PageCount { get; set; }
-        protected int MAX_ROWS { get { return PageCount * PageSize; } }
-        public int PageSize { get; set; }
-        public int CurrentPage { get; set; }
-        public string SortField { get; set; }
+        public int PageCount
+        {
+            get { return _pageCount; }
+            set { _pageCount = value; }
+        }
+        public int PageSize
+        {
+            get { return _pageSize; }
+            set { _pageSize = value; }
+        }
+        public int CurrentPage
+        {
+            get { return _currentPage; }
+            set { _currentPage = value; }
+        }
+        public string SortField
+        {
+            get { return _sortField; }
+            set { _sortField = value; }
+        }
 
         public string SortDir
         {
@@ -79,16 +98,19 @@ namespace Search
                     _sortDir = value;
             }
         }
-        private string _sortDir = string.Empty;
+
 
         public string SortString
         {
             get
             {
-                return string.IsNullOrWhiteSpace(SortField) || string.IsNullOrWhiteSpace(SortDir) ? string.Empty
-                                                                                                  : SortField + " " + SortDir;
+                return string.IsNullOrWhiteSpace(SortField)
+                    || string.IsNullOrWhiteSpace(SortDir) ? string.Empty
+                                                          : SortField + " " + SortDir;
             }
         }
+
+        protected int MAX_ROWS { get { return PageCount * PageSize; } }
         public int Skip { get { return Math.Max(0, (CurrentPage - 1) * PageSize); } }
         public int Take { get { return PageSize; } }
 
@@ -142,7 +164,7 @@ namespace Search
             {
                 MemberInfo match = (MemberInfo)currentType.GetField(currentLevel) ?? currentType.GetProperty(currentLevel);
                 if (match == null) return false;
-                currentType = GetFieldOrPropertyType(match);
+                currentType = GetFieldOrPropertyType(match, true);
             }
             return true; //if we checked all levels and found matches, exit
         }
@@ -259,16 +281,6 @@ namespace Search
         }
 
         /// <summary>
-        /// Generates the Lambda "TIn => TIn.memberName [comparison] value"
-        /// </summary>
-        static Expression<Func<TIn, bool>> MakeSimplePredicate<TIn>(string memberName, ExpressionType comparison, object value)
-        {
-            var parameter = Expression.Parameter(typeof(TIn), "t");
-            Expression left = Expression.PropertyOrField(parameter, memberName);
-            return (Expression<Func<TIn, bool>>)Expression.Lambda(Expression.MakeBinary(comparison, left, Expression.Constant(value)), parameter);
-        }
-
-        /// <summary>
         /// TODO: enumMethod string validation
         /// </summary>
         /// <param name="targetType"></param>
@@ -335,9 +347,6 @@ namespace Search
             return Expression.Lambda<Func<T, bool>>(binaryExpression, parameter);
         }
 
-        /// <summary>
-        /// Generates the Lambda "inputType => inputType.memberName [comparison] value"
-        /// </summary>
         static LambdaExpression MakeSimplePredicate(Type inputType, string memberName, ExpressionType comparison, object value)
         {
             var parameter = Expression.Parameter(inputType, "t");
@@ -353,9 +362,27 @@ namespace Search
             return GetFieldOrPropertyType(match);
         }
 
-        public static Type GetFieldOrPropertyType(MemberInfo field)
+        /// <summary>
+        /// Gets the type of a field or property.
+        /// </summary>
+        /// <param name="field"></param>
+        /// <param name="selectSingle">When true, if the item is a collection, returns the type of the underlying type.</param>
+        /// <returns></returns>
+        public static Type GetFieldOrPropertyType(MemberInfo field, bool selectSingle = false)
         {
-            return field.MemberType == MemberTypes.Property ? ((PropertyInfo)field).PropertyType : ((FieldInfo)field).FieldType;
+            Type type = field.MemberType == MemberTypes.Property ? ((PropertyInfo)field).PropertyType : ((FieldInfo)field).FieldType;
+            if (!selectSingle) return type;
+
+            //look for collection and if it is, get the interface sub-type
+            try
+            {
+                if (type.IsGenericType) type = type.GetInterfaces().FirstOrDefault(t => t.IsGenericType)
+                                                                   .GetGenericArguments()[0];
+            }
+            catch { }
+
+            //return the result
+            return type;
         }
 
         /// <summary>
