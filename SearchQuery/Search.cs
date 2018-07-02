@@ -30,13 +30,6 @@ namespace Search
     [Serializable]
     public abstract class SearchQuery<T>
     {
-        //defaults
-        protected int _pageCount = 10;
-        protected int _currentPage = 1;
-        protected int _pageSize = 10;
-        protected string _sortDir = string.Empty;
-        protected string _sortField = string.Empty;
-
         public SearchQuery()
         {
             //defaults
@@ -46,11 +39,7 @@ namespace Search
         }
 
         public abstract IQueryable<T> GetQuery();
-        public IQueryable<T> GetQuery(IQueryable<T> data)
-        {
-            return ApplyFilters(data);
-        }
-
+        public IQueryable<T> GetQuery(IQueryable<T> data) => ApplyFilters(data);
         public List<T> GetResults(IQueryable<T> data = null)
         {
             var query = data == null ? GetQuery() : GetQuery(data);
@@ -66,27 +55,12 @@ namespace Search
 
         #region Search Properties
 
-        public int PageCount
-        {
-            get { return _pageCount; }
-            set { _pageCount = value; }
-        }
-        public int PageSize
-        {
-            get { return _pageSize; }
-            set { _pageSize = value; }
-        }
-        public int CurrentPage
-        {
-            get { return _currentPage; }
-            set { _currentPage = value; }
-        }
-        public string SortField
-        {
-            get { return _sortField; }
-            set { _sortField = value; }
-        }
+        public int PageCount { get; set; }
+        public int PageSize { get; set; } = 10;
+        public int CurrentPage { get; set; } = 1;
+        public string SortField { get; set; } = string.Empty;
 
+        protected string _sortDir = string.Empty;
         public string SortDir
         {
             get { return _sortDir; }
@@ -99,14 +73,13 @@ namespace Search
             }
         }
 
-
         public string SortString
         {
             get
             {
                 return string.IsNullOrWhiteSpace(SortField)
                     || string.IsNullOrWhiteSpace(SortDir) ? string.Empty
-                                                          : SortField + " " + SortDir;
+                                                          : $"{SortField} {SortDir}";
             }
         }
 
@@ -151,10 +124,7 @@ namespace Search
             return string.Empty;
         }
 
-        private bool ValidateLinkedField(string fieldName)
-        {
-            return FieldExists(typeof(T), fieldName);
-        }
+        private bool ValidateLinkedField(string fieldName) => FieldExists(typeof(T), fieldName);
 
         private bool FieldExists(Type type, string fieldName)
         {
@@ -164,7 +134,7 @@ namespace Search
             {
                 MemberInfo match = (MemberInfo)currentType.GetField(currentLevel) ?? currentType.GetProperty(currentLevel);
                 if (match == null) return false;
-                currentType = GetFieldOrPropertyType(match, true);
+                currentType = GetMemberType(match, true);
             }
             return true; //if we checked all levels and found matches, exit
         }
@@ -177,10 +147,10 @@ namespace Search
         private string GetTargetField(MemberInfo member)
         {
             if (member == null) return string.Empty;
-            var attrib = GetCustomAttribute<LinkedField>(member);
+            var attrib = GetAttribute<LinkedField>(member);
             if (attrib == null) return string.Empty;
-            if (string.IsNullOrEmpty(attrib.TargetField)) return member.Name;
-            return attrib.TargetField;
+           return string.IsNullOrEmpty(attrib.TargetField) ? member.Name
+                                                           : attrib.TargetField;
         }
 
         #endregion
@@ -203,12 +173,11 @@ namespace Search
             {
                 foreach (var f in fields)
                 {
-                    var value = GetFieldOrPropertyValue(f, this);
+                    var value = GetMemberValue(f, this);
                     if (value == null) continue;
-                    var link = GetCustomAttribute<LinkedField>(f);
-                    Type t = GetFieldOrPropertyType(f);
-                    retVal = new SearchFilter
-                    {
+                    var link = GetAttribute<LinkedField>(f);
+                    Type t = GetMemberType(f);
+                    retVal = new SearchFilter {
                         SearchValue = value,
                         ApplySearchCondition = GetValidationExpression(t),
                         SearchExpression = GetSearchExpression(GetTargetField(f), link.Type, value, link.EnumMethod)
@@ -223,27 +192,19 @@ namespace Search
         }
 
         public static IEnumerable<MemberInfo> GetFieldsAndProperties(Type type)
-        {
-            return type.GetFields().Cast<MemberInfo>()
-                                   .Concat(type.GetProperties());
-        }
+            => type.GetFields().Cast<MemberInfo>()
+                               .Concat(type.GetProperties());
 
-        private static IEnumerable<TAttrib> GetCustomAttributes<TAttrib>(MemberInfo member)
-        {
-            try { return (IEnumerable<TAttrib>)member.GetCustomAttributes(typeof(TAttrib)); }
-            catch { return null; }
-        }
 
-        private static TAttrib GetCustomAttribute<TAttrib>(MemberInfo member)
-        {
-            try { return (TAttrib)Convert.ChangeType(member.GetCustomAttribute(typeof(TAttrib)), typeof(TAttrib)); }
-            catch { return default(TAttrib); }
-        }
+        private static IEnumerable<TAttrib> GetAttributes<TAttrib>(MemberInfo member)
+            => member.GetCustomAttributes(typeof(TAttrib))?.Cast<TAttrib>();
 
-        public static object GetFieldOrPropertyValue(MemberInfo field, object instance)
-        {
-            return field.MemberType == MemberTypes.Property ? ((PropertyInfo)field).GetValue(instance) : ((FieldInfo)field).GetValue(instance);
-        }
+        private static TAttrib GetAttribute<TAttrib>(MemberInfo member)
+            => GetAttributes<TAttrib>(member).FirstOrDefault();
+
+        public static object GetMemberValue(MemberInfo field, object instance)
+            => field.MemberType == MemberTypes.Property ? ((PropertyInfo)field).GetValue(instance) 
+                                                        : ((FieldInfo)field).GetValue(instance);
 
         /// <summary>
         /// Represents a condition to be applied AND the logic to determine whether or not the condition
@@ -306,7 +267,7 @@ namespace Search
                 {
                     //assign the current type member type 
                     currentType = SingleLevelFieldType(currentType, memberName);
-                    left = Expression.PropertyOrField(left == null ? parameter : left, memberName);
+                    left = Expression.PropertyOrField(left ?? parameter, memberName);
 
                     //mini-loop for non collection objects
                     if (!currentType.IsGenericType || (!(currentType.GetGenericTypeDefinition() == typeof(IEnumerable<>) ||
@@ -358,8 +319,8 @@ namespace Search
         {
             Type currentType = baseType;
             MemberInfo match = (MemberInfo)currentType.GetField(fieldName) ?? currentType.GetProperty(fieldName);
-            if (match == null) return null;
-            return GetFieldOrPropertyType(match);
+            return match == null ? null
+                                 : GetMemberType(match);
         }
 
         /// <summary>
@@ -368,21 +329,16 @@ namespace Search
         /// <param name="field"></param>
         /// <param name="selectSingle">When true, if the item is a collection, returns the type of the underlying type.</param>
         /// <returns></returns>
-        public static Type GetFieldOrPropertyType(MemberInfo field, bool selectSingle = false)
+        public static Type GetMemberType(MemberInfo field, bool selectSingle = false)
         {
-            Type type = field.MemberType == MemberTypes.Property ? ((PropertyInfo)field).PropertyType : ((FieldInfo)field).FieldType;
+            Type type = field.MemberType == MemberTypes.Property ? ((PropertyInfo)field).PropertyType
+                                                                 : ((FieldInfo)field).FieldType;
             if (!selectSingle) return type;
 
             //look for collection and if it is, get the interface sub-type
-            try
-            {
-                if (type.IsGenericType) type = type.GetInterfaces().FirstOrDefault(t => t.IsGenericType)
-                                                                   .GetGenericArguments()[0];
-            }
-            catch { }
-
-            //return the result
-            return type;
+            return type?.IsGenericType == true ? type.GetInterfaces().FirstOrDefault(t => t.IsGenericType)
+                                                                     .GetGenericArguments()[0]
+                                               : type;
         }
 
         /// <summary>
@@ -392,11 +348,7 @@ namespace Search
         /// <param name="targetField"></param>
         /// <param name="targetType"></param>
         /// <returns></returns>
-        public static string[] DeQualifyFieldName(string targetField, Type targetType)
-        {
-            return DeQualifyFieldName(targetField.Split('.'), targetType);
-        }
-
+        public static string[] DeQualifyFieldName(string targetField, Type targetType) => DeQualifyFieldName(targetField.Split('.'), targetType);
         public static string[] DeQualifyFieldName(string[] targetFields, Type targetType)
         {
             var r = targetFields.ToList();
@@ -410,13 +362,14 @@ namespace Search
         /// if the item is of type int?, this returns that the item should not be used as a search parameter unless it
         /// is not null and has a value >= 0.
         /// 
-        /// //TODO: allow validation regex to be specified for a field via attribute
+        /// //TODO: allow validation regex to be specified for a field via attribute and figure out how to do this more
+        ///         elegantly
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
         private static Expression<Func<object, bool>> GetValidationExpression(Type type)
         {
-            //throw exception for non-nullable types (strings are nullable, but is a reference type and thus has to be called out separately)
+            //throw exception for non-nullable types (strings are nullable, but is a reference type and thus have to be called out separately)
             if (type != typeof(string) && !(type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>)))
                 throw new Exception("Non-nullable types not supported.");
 
