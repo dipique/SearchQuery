@@ -31,13 +31,13 @@ namespace Search
 
         static IQueryable<Order> CreateSampleData()
         {
-            List<Order> orders = new List<Order>();
-
-            orders.Add(new Order
+            var orders = new List<Order>
             {
-                TxNumber = 1,
-                TxDate = new DateTime(2016, 2, 9),
-                Items = new List<Item>
+                new Order
+                {
+                    TxNumber = 1,
+                    TxDate = new DateTime(2016, 2, 9),
+                    Items = new List<Item>
                 {
                     new Item
                     {
@@ -50,22 +50,22 @@ namespace Search
                         Price = 200000m
                     }
                 },
-                OrderCustomer = new Customer
-                {
-                    Name = "Billy",
-                    CustomerAddress = new Address
+                    OrderCustomer = new Customer
                     {
-                        StreetNumber = 11,
-                        StreetName = "Maple",
-                        ZipCode = 75432
+                        Name = "Billy",
+                        CustomerAddress = new Address
+                        {
+                            StreetNumber = 11,
+                            StreetName = "Maple",
+                            ZipCode = 75432
+                        }
                     }
-                }
-            });
-            orders.Add(new Order
-            {
-                TxNumber = 2,
-                TxDate = new DateTime(2016, 2, 2),
-                Items = new List<Item>
+                },
+                new Order
+                {
+                    TxNumber = 2,
+                    TxDate = new DateTime(2016, 2, 2),
+                    Items = new List<Item>
                 {
                     new Item
                     {
@@ -73,22 +73,22 @@ namespace Search
                         Price = 50.00m
                     }
                 },
-                OrderCustomer = new Customer
-                {
-                    Name = "John",
-                    CustomerAddress = new Address
+                    OrderCustomer = new Customer
                     {
-                        StreetNumber = 22,
-                        StreetName = "Ironwood",
-                        ZipCode = 56545
+                        Name = "John",
+                        CustomerAddress = new Address
+                        {
+                            StreetNumber = 22,
+                            StreetName = "Ironwood",
+                            ZipCode = 56545
+                        }
                     }
-                }
-            });
-            orders.Add(new Order
-            {
-                TxNumber = 3,
-                TxDate = new DateTime(2016, 1, 10),
-                Items = new List<Item>
+                },
+                new Order
+                {
+                    TxNumber = 3,
+                    TxDate = new DateTime(2016, 1, 10),
+                    Items = new List<Item>
                 {
                     new Item
                     {
@@ -96,22 +96,22 @@ namespace Search
                         Price = .01m
                     }
                 },
-                OrderCustomer = new Customer
-                {
-                    Name = "Jacob",
-                    CustomerAddress = new Address
+                    OrderCustomer = new Customer
                     {
-                        StreetNumber = 33,
-                        StreetName = "Birch",
-                        ZipCode = 90210
+                        Name = "Jacob",
+                        CustomerAddress = new Address
+                        {
+                            StreetNumber = 33,
+                            StreetName = "Birch",
+                            ZipCode = 90210
+                        }
                     }
-                }
-            });
-            orders.Add(new Order
-            {
-                TxNumber = 4,
-                TxDate = new DateTime(2015, 10, 9),
-                Items = new List<Item>
+                },
+                new Order
+                {
+                    TxNumber = 4,
+                    TxDate = new DateTime(2015, 10, 9),
+                    Items = new List<Item>
                 {
                     new Item
                     {
@@ -124,22 +124,22 @@ namespace Search
                         Price = 2000.57m
                     }
                 },
-                OrderCustomer = new Customer
-                {
-                    Name = "Jill",
-                    CustomerAddress = new Address
+                    OrderCustomer = new Customer
                     {
-                        StreetNumber = 44,
-                        StreetName = "Sycamore",
-                        ZipCode = 85753
+                        Name = "Jill",
+                        CustomerAddress = new Address
+                        {
+                            StreetNumber = 44,
+                            StreetName = "Sycamore",
+                            ZipCode = 85753
+                        }
                     }
-                }
-            });
-            orders.Add(new Order
-            {
-                TxNumber = 5,
-                TxDate = new DateTime(2015, 11, 4),
-                Items = new List<Item>
+                },
+                new Order
+                {
+                    TxNumber = 5,
+                    TxDate = new DateTime(2015, 11, 4),
+                    Items = new List<Item>
                 {
                     new Item
                     {
@@ -147,17 +147,18 @@ namespace Search
                         Price = 57.99m
                     }
                 },
-                OrderCustomer = new Customer
-                {
-                    Name = "Joan",
-                    CustomerAddress = new Address
+                    OrderCustomer = new Customer
                     {
-                        StreetNumber = 55,
-                        StreetName = "Oak",
-                        ZipCode = 09771
+                        Name = "Joan",
+                        CustomerAddress = new Address
+                        {
+                            StreetNumber = 55,
+                            StreetName = "Oak",
+                            ZipCode = 09771
+                        }
                     }
                 }
-            });
+            };
             return orders.AsQueryable();
         }
     }
